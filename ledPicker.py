@@ -19,24 +19,27 @@ INSTRUCT_BINFULLAMOUNT = '%EE#RDD0060300603**'
 INSTRUCT_READBINCNT = '%EE#RDD0200002131**'
 INSTRUCT_READMAGNUMBINCNT = '%EE#RDD0047000479**'
 
-def comCon():
-	try:
-		ser = serial.Serial(COM, BAUD,DATABIT,PARITY,STOPBIT)
-	except Exception, e:
-		print 'open serial failed,restarting...'
-		#exit(1)
-		time.sleep(2)
-		ser = comCon()
-	print 'A Serial Echo Is Running...'
-	return ser
+class comCon:
+	def __init__(self,com,baud,databit,parity,stopbit):
+		try:
+			self.ser = serial.Serial(COM, BAUD,DATABIT,PARITY,STOPBIT)
+		except Exception, e:
+			print 'open serial failed'
+			self.ser = None
+	
+	def __del__(self):
+		self.ser.close()
 
-def getVal(comSer,inst):
+def getVal(inst):
+	comSer = comCon(COM,BAUD,DATABIT,PARITY,STOPBIT)
+	if(comSer==None):
+		return '-1'
 	print 'write:'+inst
-	comSer.write(inst+'\r')
-	comSer.flush()
+	comSer.ser.write(inst+'\r')
+	comSer.ser.flush()
 	reply = ''
 	while True:
-		tmp = comSer.read()
+		tmp = comSer.ser.read()
 		reply += tmp
 		if(tmp=='\r'):
 			break
@@ -62,8 +65,6 @@ def hexStrToInt(hexStr):
 	return int(value)
 
 def main():
-	ser = comCon()
-	
 	sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 	sock.bind((IP,PORT))
 	sock.listen(1)
@@ -76,13 +77,13 @@ def main():
 			print 'recv:'+buf
 			value = ''
 			if(buf=='getIsBinFull'):
-				value = getVal(ser,INSTRUCT_ISBINFULL)
+				value = getVal(INSTRUCT_ISBINFULL)
 				if(value.find('RC1')>0):
 					connection.send('true')
 				else:
 					connection.send('false')
 			elif(buf=='getBinFullAmount'):
-				value = getVal(ser,INSTRUCT_BINFULLAMOUNT)
+				value = getVal(INSTRUCT_BINFULLAMOUNT)
 				if(value.find('$')>0):
 					tmp = value[8:10]+value[6:8]
 					while tmp[0] == '0':
@@ -93,7 +94,7 @@ def main():
 				else:
 					connection.send('-1')
 			elif(buf=='getBinFullNo'):
-				value = getVal(ser,INSTRUCT_BINFULLNO)
+				value = getVal(INSTRUCT_BINFULLNO)
 				if(value.find('$')>0):
 					tmp = value[8:10]+value[6:8]
 					while tmp[0] == '0':
@@ -104,7 +105,9 @@ def main():
 				else:
 					connection.send('-1')
 			elif(buf=='getBinMagnumCnt'):
-				value = getVal(ser,INSTRUCT_READMAGNUMBINCNT)
+				value = getVal(INSTRUCT_READMAGNUMBINCNT)
+				if(value=='-1'):
+					continue
 				value = value[6:]
 				valStr = ''
 				j = 0
@@ -115,6 +118,8 @@ def main():
 					j += 8
 				connection.send(valStr.rstrip(','))
 			elif(buf=='getBinCnt'):
+				if(value=='-1'):
+					continue
 				ins  = INSTRUCT_READBINCNT
 				instLis = []
 				instLis.append(ins.replace('0200002131', '0200002026'))
@@ -125,7 +130,7 @@ def main():
 				
 				valStr = ''
 				for lis in instLis:
-					value = getVal(ser,lis)
+					value = getVal(lis)
 					value = value[6:]
 					j = 0
 					for i in range(len(value)/4):
@@ -137,10 +142,6 @@ def main():
 
 		except Exception,e:
 			print e
-			ser.close
-			ser = None
-			print 'restarting COM'
-			ser = comCon()
 		finally:
 			if connection != None:
 				connection.close()
