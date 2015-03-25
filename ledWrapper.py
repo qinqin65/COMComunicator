@@ -26,11 +26,12 @@ class comCon:
 			self.ser = None
 	
 	def __del__(self):
-		self.ser.close()
+		if(self.ser!=None):
+			self.ser.close()
 
 def getVal(inst):
 	comSer = comCon(COM,BAUD,DATABIT,PARITY,STOPBIT)
-	if(comSer==None):
+	if(comSer.ser==None):
 		return '-1'
 	print 'write:'+inst
 	comSer.ser.write(inst+'\r')
